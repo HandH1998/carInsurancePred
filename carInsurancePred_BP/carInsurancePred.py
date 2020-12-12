@@ -29,7 +29,6 @@ def preProc(dataTain):
     yTrain = torch.from_numpy(np.array(yTrain)).type(torch.LongTensor)
     return xTrain, yTrain
 
-
 dataTrain = pd.read_csv(r'C:\Users\ZY\Desktop\ML\VI_train.csv')
 response = dataTrain['Response'].value_counts()
 print(response[1] * 1.0 / sum(response))
