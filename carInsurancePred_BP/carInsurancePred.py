@@ -6,9 +6,12 @@ import torch.utils.data as Data
 import matplotlib.pyplot as plt
 from imblearn.under_sampling import RandomUnderSampler
 
-def preProc(dataTain):
+def preProc(dataTrain):
     dataTrain.dropna(axis=0, how='any', inplace=True)
     dataTrain.drop(dataTrain.columns[0:2], axis=1, inplace=True)
+    # print(dataTrain)
+    dataTrain = dataTrain.sample(frac=1)
+    # print(dataTrain)
     yTrain = dataTrain.iloc[:, -1]
     xTrain = dataTrain.iloc[:, :-1]
     # print(yTrain)
@@ -33,6 +36,8 @@ dataTrain = pd.read_csv(r'C:\Users\ZY\Desktop\ML\VI_train.csv')
 response = dataTrain['Response'].value_counts()
 print(response[1] * 1.0 / sum(response))
 weights=[response[1] * 1.0 / sum(response),response[0] * 1.0 / sum(response)]
+# weights=[0.4,0.6]
+# print(weights)
 weights=torch.from_numpy(np.array(weights)).type(torch.FloatTensor)
 # threshold = response[1] * 1.0 / response[0]
 xTrain, yTrain = preProc(dataTrain)
@@ -40,8 +45,8 @@ xTrain, yTrain = preProc(dataTrain)
 print(xTrain, yTrain)
 torch.save(xTrain, 'xTrain.pt')
 torch.save(yTrain, 'yTrain.pt')
-BATCH_SIZE = 5000
-EPOCH = 50
+BATCH_SIZE = 50000
+EPOCH = 100
 torch_dataset = Data.TensorDataset(xTrain, yTrain)
 loader = Data.DataLoader(
     dataset=torch_dataset,
@@ -51,19 +56,44 @@ loader = Data.DataLoader(
 
 
 class Net(torch.nn.Module):
-    def __init__(self, n_feature, n_hidden, n_output):
+    def __init__(self, n_feature, n_hidden, n_output,m=4):
         super().__init__()
-        self.hidden1 = torch.nn.Linear(n_feature, n_hidden)
-        self.hidden2 = torch.nn.Linear(n_hidden, n_hidden)
+        # self.hidden1 = torch.nn.Linear(n_feature, n_hidden)
+        # self.bn1=torch.nn.BatchNorm1d(n_hidden,momentum=0.5)
+        # self.hidden2 = torch.nn.Linear(n_hidden, n_hidden)
+        # self.bn2=torch.nn.BatchNorm1d(n_hidden,momentum=0.5)
         # self.hidden3 = torch.nn.Linear(n_hidden, n_hidden)
+        # self.bn3=torch.nn.BatchNorm1d(n_hidden,momentum=0.5)
         # self.hidden4 = torch.nn.Linear(n_hidden, n_hidden)
+        # self.bn4=torch.nn.BatchNorm1d(n_hidden,momentum=0.5)
+        self.layer_num=m
+        self.hiddens=[]
+        self.bns=[]
+        for i in range(self.layer_num):
+            if i==0:
+                hidden=torch.nn.Linear(n_feature,n_hidden)
+            else:
+                hidden=torch.nn.Linear(n_hidden,n_hidden)
+            bn = torch.nn.BatchNorm1d(n_hidden, momentum=0.5)
+            setattr(self,'hidden%i'%(i+1),hidden)
+            setattr(self,'bn%i'%(i+1),bn)
+            self.hiddens.append(hidden)
+            self.bns.append(bn)
         self.predict = torch.nn.Linear(n_hidden, n_output)
 
     def forward(self, x):
-        x = F.relu(self.hidden1(x))
-        x = F.relu(self.hidden2(x))
-        # x = F.relu(self.hidden3(x))
-        # x = F.relu(self.hidden4(x))
+        # x=self.bn1(self.hidden1(x))
+        # # x=torch.nn.ReLU(x)
+        # x=F.relu(x)
+        # x = self.bn2(self.hidden2(x))
+        # x=F.relu(x)
+        # x=self.bn3(self.hidden3(x))
+        # x=F.relu(x)
+        # x=self.bn4(self.hidden4(x))
+        # x=F.relu(x)
+        for i in range(self.layer_num):
+            x=self.bns[i](self.hiddens[i](x))
+            x=F.relu(x)
         x = self.predict(x)
         return x
 
@@ -88,7 +118,7 @@ def fscoreCal(p, r, b):
     # return 2*tp*1.0/(y1.shape[0]+tp-tn)
 
 
-net = Net(14, 10, 2)
+net = Net(14, 20, 2,4)
 print(net)
 LR = 0.02
 optimizer = torch.optim.Adam(net.parameters(), lr=LR, betas=(0.9, 0.99))
@@ -138,8 +168,10 @@ for epoch in range(EPOCH):
     plt.ylabel('Fvalue')
     plt.title(u'训练过程')
 
+
     # print('loss:',loss.detach().numpy())
     # lossList.append(loss)
+    # # plt.figure()
     # plt.plot(epochList, lossList)
     # plt.xlabel(u'迭代次数')
     # plt.ylabel(u'误差')

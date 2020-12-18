@@ -26,8 +26,8 @@ def preProc(dataTain):
     # print(xTrain.head(10))
     # xTrain.boxplot(fontsize=6)
     # plt.show()
-    xTrain = torch.from_numpy(np.array(xTrain)).type(torch.FloatTensor).to(device)
-    yTrain = torch.from_numpy(np.array(yTrain)).type(torch.LongTensor).to(device)
+    xTrain = torch.from_numpy(np.array(xTrain)).type(torch.FloatTensor)
+    yTrain = torch.from_numpy(np.array(yTrain)).type(torch.LongTensor)
     return xTrain, yTrain
 
 
@@ -59,16 +59,24 @@ class Net(torch.nn.Module):
     def __init__(self, n_feature, n_hidden, n_output):
         super().__init__()
         self.hidden1 = torch.nn.Linear(n_feature, n_hidden)
+        self.bn1=torch.nn.BatchNorm1d(n_hidden,momentum=0.5)
         self.hidden2 = torch.nn.Linear(n_hidden, n_hidden)
-        # self.hidden3 = torch.nn.Linear(n_hidden, n_hidden)
+        self.bn2=torch.nn.BatchNorm1d(n_hidden,momentum=0.5)
+        self.hidden3 = torch.nn.Linear(n_hidden, n_hidden)
+        self.bn3=torch.nn.BatchNorm1d(n_hidden,momentum=0.5)
         # self.hidden4 = torch.nn.Linear(n_hidden, n_hidden)
         self.predict = torch.nn.Linear(n_hidden, n_output)
 
     def forward(self, x):
-        x = F.relu(self.hidden1(x))
-        x = F.relu(self.hidden2(x))
+        # x = torch.nn.ReLU(self.hidden1(x))
+        x=self.bn1(self.hidden1(x))
+        x=F.relu(x)
+        x = self.bn2(self.hidden2(x))
+        x=F.relu(x)
+        x=self.bn3(self.hidden3(x))
         # x = F.relu(self.hidden3(x))
         # x = F.relu(self.hidden4(x))
+        x=F.relu(x)
         x = self.predict(x)
         return x
 
@@ -107,9 +115,10 @@ lossList = []
 for epoch in range(EPOCH):
     print('epoch:', epoch)
     for step, (batch_x, batch_y) in enumerate(loader):
-        output = net(batch_x)
+        x=batch_x.to(device)
+        output = net(x)
         # print(torch.argmax())
-        loss = loss_func(output, batch_y)
+        loss = loss_func(output, batch_y.to(device))
         optimizer.zero_grad()
         loss.backward()
         optimizer.step()
@@ -123,7 +132,7 @@ for epoch in range(EPOCH):
     # prediction = torch.max(probUpdate, 1)[1]
     prediction = torch.max(prob, 1)[1]
     pred_y = prediction.cpu().numpy()
-    target_y = batch_y.cpu().numpy()
+    target_y = batch_y.numpy()
     # print(pred_y.shape[0])
     # accuracy=sum(pred_y==target_y)/BATCH_SIZE
     # print('accuracy:',accuracy)

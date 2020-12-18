@@ -9,19 +9,43 @@ import json
 
 
 class Net(torch.nn.Module):
-    def __init__(self, n_feature, n_hidden, n_output):
+    def __init__(self, n_feature, n_hidden, n_output,m=4):
         super().__init__()
-        self.hidden1 = torch.nn.Linear(n_feature, n_hidden)
-        self.hidden2 = torch.nn.Linear(n_hidden, n_hidden)
-        # self.hidden3=torch.nn.Linear(n_hidden,n_hidden)
-        # self.hidden4=torch.nn.Linear(n_hidden,n_hidden)
+        # self.hidden1 = torch.nn.Linear(n_feature, n_hidden)
+        # self.bn1=torch.nn.BatchNorm1d(n_hidden,momentum=0.5)
+        # self.hidden2 = torch.nn.Linear(n_hidden, n_hidden)
+        # self.bn2=torch.nn.BatchNorm1d(n_hidden,momentum=0.5)
+        # self.hidden3 = torch.nn.Linear(n_hidden, n_hidden)
+        # self.bn3=torch.nn.BatchNorm1d(n_hidden,momentum=0.5)
+        # self.hidden4 = torch.nn.Linear(n_hidden, n_hidden)
+        # self.bn4=torch.nn.BatchNorm1d(n_hidden,momentum=0.5)
+        self.layer_num=m
+        self.hiddens=[]
+        self.bns=[]
+        for i in range(self.layer_num):
+            if i==0:
+                hidden=torch.nn.Linear(n_feature,n_hidden)
+            else:
+                hidden=torch.nn.Linear(n_hidden,n_hidden)
+            bn = torch.nn.BatchNorm1d(n_hidden, momentum=0.5)
+            setattr(self,'hidden%i'%(i+1),hidden)
+            setattr(self,'bn%i'%(i+1),bn)
+            self.hiddens.append(hidden)
+            self.bns.append(bn)
         self.predict = torch.nn.Linear(n_hidden, n_output)
 
     def forward(self, x):
-        x = F.relu(self.hidden1(x))
-        x = F.relu(self.hidden2(x))
-        # x=F.relu(self.hidden3(x))
-        # x=F.relu(self.hidden4(x))
+        # x=self.bn1(self.hidden1(x))
+        # x=F.relu(x)
+        # x = self.bn2(self.hidden2(x))
+        # x=F.relu(x)
+        # x=self.bn3(self.hidden3(x))
+        # x=F.relu(x)
+        # x=self.bn4(self.hidden4(x))
+        # x=F.relu(x)
+        for i in range(self.layer_num):
+            x=self.bns[i](self.hiddens[i](x))
+            x=F.relu(x)
         x = self.predict(x)
         return x
 
@@ -86,38 +110,36 @@ def fscoreCal(p, r, b):
     # tn = sum(np.all([y1 == 0, y1 == y2], axis = 0))
     # return 2*tp*1.0/(y1.shape[0]+tp-tn)
 
-# dataTest=pd.read_csv(r'C:\Users\ZY\Desktop\ML\VI_test.csv')
-dataTrain=pd.read_csv(r'C:\Users\ZY\Desktop\ML\VI_train.csv')
-# xTest=preProcTest(dataTest)
-xTest,yTest=preProc(dataTrain)
-net = Net(14, 10, 2)
+dataTest=pd.read_csv(r'C:\Users\ZY\Desktop\ML\VI_test.csv')
+# dataTrain=pd.read_csv(r'C:\Users\ZY\Desktop\ML\VI_train.csv')
+xTest=preProcTest(dataTest)
+# xTest,yTest=preProc(dataTrain)
+net = Net(14, 10, 2,4)
 # xTest = torch.load('xTest.pt')
 # yTest = torch.load('yTest.pt')
-# threshold = torch.load('threshold.pt')
 # net = torch.load('carInsurancePred.pt')
 net.load_state_dict(torch.load('carInsurancePredParams.pt'))
+net.eval()
 
 
-# dic = OrderedDict()
+dic = OrderedDict()
 output = net(xTest)
 prob = F.softmax(output, dim=1)
-# probUpdate = torch.cat((prob[:, 0].unsqueeze(-1) * threshold, prob[:, 1].unsqueeze(-1)), -1)
 # prediction = torch.max(probUpdate, 1)[1]
 prediction = torch.max(prob, 1)[1]
 pred_y = prediction.numpy()
-target_y = yTest.numpy()
-p = precisionCal(pred_y, target_y)
-r = recallCal(pred_y, target_y)
+# target_y = yTest.numpy()
+# p = precisionCal(pred_y, target_y)
+# r = recallCal(pred_y, target_y)
 # fscore = fscoreCal(pred_y, target_y)
-fscore = fscoreCal(p, r, 1)
-print('Fvalue:', fscore)
+# fscore = fscoreCal(p, r, 1)
+# print('Fvalue:', fscore)
 equal1count = sum(pred_y == 1)
 print('预测结果为1的数量:', equal1count)
 
-print(pred_y)
-# for i, res in enumerate(pred_y):
-#     dic[str(i)] = res.tolist()
-# # 一维张量dim只有-1和0，-1就是最高维1维
-# jsonStr = json.dumps(dic, indent=4)
-# with open('submission.json', 'w') as f:
-#     f.write(jsonStr)
+for i, res in enumerate(pred_y):
+    dic[str(i)] = res.tolist()
+# 一维张量dim只有-1和0，-1就是最高维1维
+jsonStr = json.dumps(dic, indent=4)
+with open('submission.json', 'w') as f:
+    f.write(jsonStr)
